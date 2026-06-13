@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FIFA 2026 Live Sports</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.16.3/shaka-player.compiled.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  background:#07090f;
+  font-family:'Inter',sans-serif;
+  color:#e2e8f0;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 10% 10%,rgba(0,180,255,.05) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 40% at 90% 90%,rgba(0,255,120,.04) 0%,transparent 70%);
+  pointer-events:none;z-index:0;
+}
+
+/* HEADER */
+header{
+  position:sticky;top:0;z-index:200;
+  background:rgba(7,9,15,.97);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(0,200,255,.18);
+  box-shadow:0 2px 30px rgba(0,0,0,.6);
+}
+.hdr{
+  max-width:1400px;margin:0 auto;
+  padding:10px 18px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.logo-wrap{display:flex;align-items:center;gap:10px}
+.logo-wrap img{width:40px;height:40px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(0,200,255,.7))}
+.site-name{
+  font-family:'Orbitron',monospace;font-size:1rem;font-weight:900;
+  background:linear-gradient(120deg,#00d4ff,#00ff88);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;
+}
+.site-sub{font-size:.58rem;color:rgba(255,255,255,.35);letter-spacing:2.5px;text-transform:uppercase;-webkit-text-fill-color:rgba(255,255,255,.35)}
+.live-pill{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,30,30,.12);border:1px solid rgba(255,50,50,.35);
+  border-radius:20px;padding:4px 14px;
+  font-size:.68rem;font-weight:700;color:#ff4444;letter-spacing:1.5px;
+}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#ff3333;animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* PLAYER */
+.player-wrap{
+  max-width:1400px;margin:0 auto;
+  padding:18px 18px 0;
+  position:relative;z-index:1;
+}
+.player-box{
+  position:relative;width:100%;aspect-ratio:16/9;
+  background:#000;border-radius:14px;overflow:hidden;
+  border:1px solid rgba(0,200,255,.18);
+  box-shadow:0 0 50px rgba(0,0,0,.8),0 0 20px rgba(0,200,255,.08);
+}
+.player-box iframe,
+.player-box video{position:absolute;inset:0;width:100%;height:100%;border:none;}
+.player-box video{background:#000;display:none}
+
+/* Welcome */
+#welcome{
+  position:absolute;inset:0;z-index:5;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:linear-gradient(135deg,#07090f,#0d1525);
+}
+#welcome img{width:80px;height:80px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(0,200,255,.5));animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+#welcome .wt{font-family:'Orbitron',monospace;font-size:.95rem;color:rgba(255,255,255,.45);letter-spacing:2px}
+#welcome .ws{font-size:.72rem;color:rgba(255,255,255,.22)}
+
+/* Loader */
+#loader{
+  position:absolute;inset:0;z-index:6;display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:14px;
+  background:rgba(0,0,0,.92);
+}
+.spin{width:46px;height:46px;border:3px solid rgba(0,200,255,.18);border-top-color:#00d4ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-txt{font-family:'Orbitron',monospace;font-size:.72rem;color:#00d4ff;letter-spacing:2px;animation:blink 1.4s infinite}
+
+/* Error */
+#err-screen{
+  position:absolute;inset:0;z-index:5;display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:10px;
+  background:#000;
+}
+#err-screen .ei{font-size:2.4rem}
+#err-screen .et{font-size:.8rem;color:rgba(255,255,255,.35);text-align:center;max-width:240px}
+
+/* Now playing bar */
+.np-bar{
+  max-width:1400px;margin:0 auto;
+  padding:9px 18px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  position:relative;z-index:1;
+}
+.np-label{font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3)}
+#np-name{font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700;color:#00ff88;text-shadow:0 0 10px rgba(0,255,136,.35)}
+
+
+
+/* CHANNELS GRID */
+.ch-section{
+  max-width:1400px;margin:0 auto;
+  padding:8px 18px 50px;
+  position:relative;z-index:1;
+}
+.sec-ttl{
+  font-family:'Orbitron',monospace;font-size:.62rem;
+  letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,255,255,.25);
+  margin-bottom:12px;padding-bottom:6px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.ch-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(145px,1fr));
+  gap:11px;
+}
+
+
+
+/* Channel card */
+.card{
+  background:#0c1523;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;padding:14px 10px;
+  cursor:pointer;transition:all .22s;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  text-align:center;position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,212,255,.06),rgba(0,255,136,.03));
+  opacity:0;transition:opacity .22s;
+}
+.card:hover{border-color:rgba(0,212,255,.4);transform:translateY(-2px);background:#111e30;box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 14px rgba(0,212,255,.1)}
+.card:hover::before{opacity:1}
+.card.act{border-color:#00ff88;background:rgba(0,255,136,.06);box-shadow:0 0 18px rgba(0,255,136,.18)}
+.card.act::after{
+  content:'● LIVE';position:absolute;top:6px;right:6px;
+  font-size:.5rem;font-weight:700;color:#00ff88;letter-spacing:1px;
+  background:rgba(0,255,136,.14);padding:2px 6px;border-radius:10px;
+}
+
+.ch-logo{
+  width:62px;height:46px;object-fit:contain;border-radius:6px;
+  filter:brightness(.88);transition:filter .2s;
+  background:rgba(255,255,255,.03);padding:3px;
+}
+.card:hover .ch-logo{filter:brightness(1.1)}
+.card.act .ch-logo{filter:brightness(1.15) drop-shadow(0 0 5px rgba(0,255,136,.35))}
+
+.ch-name{font-size:.7rem;font-weight:600;color:rgba(255,255,255,.8);line-height:1.3;position:relative;z-index:1}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.02)}
+::-webkit-scrollbar-thumb{background:rgba(0,212,255,.25);border-radius:10px}
+
+@media(max-width:600px){
+  .ch-grid{grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:8px}
+  .site-name{font-size:.82rem}
+  .player-wrap{padding:10px 10px 0}
+  .ch-section{padding:6px 10px 40px}
+  .np-bar{padding:7px 10px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="hdr">
+    <div class="logo-wrap">
+      <img src="https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/330px-2026_FIFA_World_Cup_emblem.svg.png" alt="FIFA 2026"/>
+      <div>
+        <div class="site-name">FIFA 2026 LIVE</div>
+        <div class="site-sub">World Cup Streaming</div>
+      </div>
+    </div>
+    <div class="live-pill"><span class="live-dot"></span>LIVE</div>
+  </div>
+</header>
+
+<!-- PLAYER -->
+<div class="player-wrap">
+  <div class="player-box" id="player-box">
+    <div id="welcome">
+      <img src="https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/330px-2026_FIFA_World_Cup_emblem.svg.png" alt="FIFA 2026"/>
+      <div class="wt">SELECT A CHANNEL</div>
+      <div class="ws">Pick any channel below to start watching</div>
+    </div>
+    <div id="loader"><div class="spin"></div><div class="load-txt">LOADING STREAM…</div></div>
+    <div id="err-screen"><div class="ei">📡</div><div class="et">Stream unavailable. Please try another channel.</div></div>
+    <iframe id="ifr" style="display:none;" allowfullscreen allow="autoplay;fullscreen;encrypted-media" referrerpolicy="no-referrer-when-downgrade" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"></iframe>
+    <video id="vid" controls playsinline></video>
+  </div>
+</div>
+
+<!-- NOW PLAYING -->
+<div class="np-bar">
+  <span class="np-label">Now Playing</span>
+  <span id="np-name">—</span>
+</div>
+
+<!-- CHANNELS -->
+<div class="ch-section">
+  <div class="sec-ttl">Live Channels</div>
+  <div class="ch-grid" id="ch-grid"></div>
+</div>
+
+<script>
+const FIFA_LOGO = 'https://upload.wikimedia.org/wikipedia/en/thumb/1/17/2026_FIFA_World_Cup_emblem.svg/330px-2026_FIFA_World_Cup_emblem.svg.png';
+
+/* ─────────────────────────────────────────────
+   CHANNELS — all in one flat list
+   D Sports is index 0 → auto-plays first
+───────────────────────────────────────────── */
+const CHANNELS = [
+
+  /* ══ IFRAME ══ */
+  {
+    name: 'D Sports',
+    logo: 'https://res.cloudinary.com/dlzxf85nw/image/upload/q_auto/f_auto/v1781169649/dsports_wxvwta.png',
+    type: 'iframe',
+    url: 'https://cinexcricket.com/chns/dsports'
+  },
+  {
+    name: 'TSN',
+    logo: FIFA_LOGO,
+    type: 'iframe',
+    url: 'https://fifa-world-cup-live.pages.dev/tsn'
+  },
+  {
+    name: 'SporTV',
+    logo: FIFA_LOGO,
+    type: 'iframe',
+    url: 'https://fifa-world-cup-live.pages.dev/sportv'
+  },
+  {
+    name: 'Telemundo',
+    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQOZaCQC3y3vyoMF_kkXLOiNcGrfA2XhKGlAA&s',
+    type: 'iframe',
+    url: 'https://cinexcricket.com/chns/kvea'
+  },
+  {
+    name: 'English Live',
+    logo: FIFA_LOGO,
+    type: 'iframe',
+    url: 'https://allrounderlive.in/eng'
+  },
+
+  /* ══ HLS ══ */
+  {
+    name: 'Fussball TV 1',
+    logo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcREBFqXw3-lP2zVdBuyqf-d0gB5ELqP49SPSg&s',
+    type: 'hls',
+    url: 'https://xtream.lazyspace.online/uplink/play/742610/lmND4qC9ustQ/live.m3u8'
+  },
+
+  /* ══ SHAKA — MPD + ClearKey DRM ══ */
+  {
+    name: 'ZEE Hindi SD',
+    logo: FIFA_LOGO,
+    type: 'shaka',
+    url: 'https://d1g8wgjurz8via.cloudfront.net/bpk-tv/Zeecinema/default/manifest.mpd',
+    clearkeys: { '43513b13f4b542e39c9265921dfc1726': 'b0b2678bcd274c37b888a6c987d502ed' }
+  },
+  {
+    name: 'ZEE Bangla SD',
+    logo: FIFA_LOGO,
+    type: 'shaka',
+    url: 'https://d1g8wgjurz8via.cloudfront.net/bpk-tv/Zeebanglacinema/default/manifest.mpd',
+    clearkeys: { 'fbbfd9ce4bbe4d818b16df7dfe89f05b': '1e96d0f88ef740e982d6f6105721c8bc' }
+  }
+];
+
+/* ── DOM refs ── */
+const ifrEl     = document.getElementById('ifr');
+const vidEl     = document.getElementById('vid');
+const welcome   = document.getElementById('welcome');
+const loader    = document.getElementById('loader');
+const errScreen = document.getElementById('err-screen');
+const npName    = document.getElementById('np-name');
+const grid      = document.getElementById('ch-grid');
+
+let activeCard  = null;
+let hlsInst     = null;
+let shakaInst   = null;
+
+/* ── Init Shaka ── */
+shaka.polyfill.installAll();
+
+/* ── Build channel grid ── */
+function buildGrid() {
+  grid.innerHTML = '';
+  CHANNELS.forEach((ch, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.idx = i;
+    const logo = ch.logo || FIFA_LOGO;
+    card.innerHTML = `
+      <img class="ch-logo" src="${logo}" alt="${ch.name}" onerror="this.src='${FIFA_LOGO}'"/>
+      <div class="ch-name">${ch.name}</div>
+    `;
+    card.addEventListener('click', () => playChannel(ch, card));
+    grid.appendChild(card);
+  });
+}
+
+/* ── Hide all player layers ── */
+function hideAll() {
+  welcome.style.display  = 'none';
+  loader.style.display   = 'none';
+  errScreen.style.display = 'none';
+  ifrEl.style.display    = 'none';
+  vidEl.style.display    = 'none';
+}
+
+function showLoader() { hideAll(); loader.style.display = 'flex'; }
+function showError()  { hideAll(); errScreen.style.display = 'flex'; }
+
+/* ── Destroy existing players ── */
+async function destroyPlayers() {
+  if (hlsInst) {
+    try { hlsInst.destroy(); } catch(e){}
+    hlsInst = null;
+  }
+  if (shakaInst) {
+    try { await shakaInst.destroy(); } catch(e){}
+    shakaInst = null;
+  }
+  vidEl.src = '';
+  ifrEl.src = 'about:blank';
+}
+
+/* ── Play a channel ── */
+async function playChannel(ch, card) {
+  if (activeCard) activeCard.classList.remove('act');
+  card.classList.add('act');
+  activeCard = card;
+
+  npName.textContent = ch.name;
+
+  document.getElementById('player-box').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  await destroyPlayers();
+  showLoader();
+
+  if      (ch.type === 'iframe') playIframe(ch.url);
+  else if (ch.type === 'hls')   playHLS(ch.url);
+  else if (ch.type === 'shaka') playShaka(ch.url, ch.clearkeys || {});
+}
+
+/* ── IFRAME ── */
+function playIframe(url) {
+  ifrEl.src = url;
+  ifrEl.style.display = 'block';
+  const t = setTimeout(() => { loader.style.display = 'none'; }, 2500);
+  ifrEl.onload = () => { clearTimeout(t); loader.style.display = 'none'; };
+}
+
+/* ── HLS.js ── */
+function playHLS(url) {
+  vidEl.style.display = 'block';
+  if (Hls.isSupported()) {
+    const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+    hlsInst = hls;
+    hls.loadSource(url);
+    hls.attachMedia(vidEl);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      loader.style.display = 'none';
+      vidEl.play().catch(() => {});
+    });
+    hls.on(Hls.Events.ERROR, (e, data) => {
+      if (data.fatal) showError();
+    });
+    setTimeout(() => { loader.style.display = 'none'; }, 9000);
+  } else if (vidEl.canPlayType('application/vnd.apple.mpegurl')) {
+    vidEl.src = url;
+    vidEl.addEventListener('loadedmetadata', () => {
+      loader.style.display = 'none';
+      vidEl.play().catch(() => {});
+    }, { once: true });
+    vidEl.addEventListener('error', showError, { once: true });
+  } else {
+    showError();
+  }
+}
+
+/* ── SHAKA PLAYER (MPD + ClearKey) ── */
+async function playShaka(url, clearkeys) {
+  vidEl.style.display = 'block';
+
+  if (!shaka.Player.isBrowserSupported()) {
+    showError();
+    return;
+  }
+
+  try {
+    const player = new shaka.Player(vidEl);
+    shakaInst = player;
+
+    player.addEventListener('error', (e) => {
+      console.error('Shaka error:', e.detail);
+    });
+
+    // Configure ClearKey DRM
+    if (Object.keys(clearkeys).length > 0) {
+      // Convert hex keys to base64url for Shaka
+      const shakaKeys = {};
+      for (const [kid, key] of Object.entries(clearkeys)) {
+        const kidB64 = hexToBase64url(kid);
+        const keyB64 = hexToBase64url(key);
+        shakaKeys[kidB64] = keyB64;
+      }
+
+      player.configure({
+        drm: {
+          clearKeys: shakaKeys
+        }
+      });
+    }
+
+    player.configure({
+      streaming: {
+        bufferingGoal: 30,
+        rebufferingGoal: 2,
+        bufferBehind: 30,
+        retryParameters: { maxAttempts: 3, baseDelay: 1000, backoffFactor: 2, fuzzFactor: 0.5, timeout: 30000 }
+      }
+    });
+
+    await player.load(url);
+    loader.style.display = 'none';
+    vidEl.play().catch(() => {});
+
+  } catch(err) {
+    console.error('Shaka load error:', err);
+    loader.style.display = 'none';
+    showError();
+  }
+}
+
+/* ── Hex to Base64URL helper ── */
+function hexToBase64url(hex) {
+  const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+  let str = '';
+  bytes.forEach(b => str += String.fromCharCode(b));
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/* ── Init ── */
+buildGrid();
+
+// Auto-play D Sports (index 0) on load
+const allCards = grid.querySelectorAll('.card');
+if (CHANNELS.length > 0 && allCards.length > 0) {
+  setTimeout(() => playChannel(CHANNELS[0], allCards[0]), 300);
+}
+</script>
+</body>
+</html>
